@@ -19,8 +19,29 @@ bun run index.html
 
 ```bash
 bun run dev        # 启动页面
+bun run build      # 构建生产静态文件到 dist/
 bun run test       # 运行单元测试
 bun run typecheck  # TypeScript 类型检查
+```
+
+## 发布到 Vercel
+
+项目已包含 `vercel.json`，Vercel 会执行 `bun run build` 并发布 `dist/` 目录。
+
+### 通过 Vercel Dashboard 发布
+
+1. 把项目推送到 GitHub/GitLab/Bitbucket。
+2. 在 Vercel 新建项目并导入仓库。
+3. Framework Preset 选择 `Other`。
+4. 确认 Build Command 是 `bun run build`，Output Directory 是 `dist`。
+5. 点击 Deploy。
+
+### 通过 Vercel CLI 发布
+
+```bash
+npm i -g vercel
+vercel login
+vercel --prod
 ```
 
 ## 页面操作

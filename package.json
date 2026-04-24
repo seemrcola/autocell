@@ -1,6 +1,7 @@
 {
   "name": "autocell",
   "scripts": {
+    "build": "bun build ./index.html --outdir ./dist",
     "dev": "bun run index.html",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
