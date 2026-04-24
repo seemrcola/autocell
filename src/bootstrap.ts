@@ -1,105 +1,22 @@
-import type { Automaton, Cell, NeighborPattern } from "./types";
-import { GAME_OF_LIFE, DIAMOEBA, Maze, Mazectric, HighLife, Seeds } from "./rules";
+import { Board, computeNextBoard } from "./core";
+import { automatonOptions } from "./rules";
+import type { Automaton, AutomatonOption, Cell, RunningStatus } from "./types";
 
-const COLS = 160;
-const ROWS = 160;
+const COLS = 100;
+const ROWS = 100;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 
-class Board {
-  public width: number;
-  public height: number;
-  public cells: Cell[];
+type AutomatonOptionId = AutomatonOption["id"];
 
-  constructor(width: number, height: number, cell: Cell = 0) {
-    this.width = width;
-    this.height = height;
-    this.cells = Array(width * height).fill(cell);
+function getAutomatonOption(id: AutomatonOptionId): AutomatonOption {
+  const option = automatonOptions.find((automatonOption) => automatonOption.id === id) ?? automatonOptions[0];
+
+  if (!option) {
+    throw new Error("[automaton error] no automaton options available");
   }
 
-  get(x: number, y: number): Cell {
-    return this.cells[y * this.width + x]!;
-  }
-
-  set(x: number, y: number, cell: Cell) {
-    this.cells[y * this.width + x] = cell;
-  }
-
-  fill(cell: Cell) {
-    this.cells.fill(cell);
-  }
-}
-
-function mod(a: number, b: number): number {
-  return ((a % b) + b) % b;
-}
-
-function countNeighbors(board: Board, states: number, x0: number, y0: number): NeighborPattern {
-  const neighbors = Array(states).fill(0);
-
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dy === 0) {
-        continue;
-      }
-
-      const x = x0 + dx;
-      const y = y0 + dy;
-
-      if (x < 0 || x >= board.width || y < 0 || y >= board.height) {
-        continue;
-      }
-
-      // 对应的状态增加1
-      neighbors[board.get(x, y)]! += 1;
-    }
-  }
-
-  return neighbors.join("");
-}
-
-function computeNextBoard(automaton: Automaton, current: Board, next: Board) {
-  if (current.width !== next.width || current.height !== next.height) {
-    throw new Error("[board error] board sizes do not match");
-  }
-
-  for (let y = 0; y < current.height; y++) {
-    for (let x = 0; x < current.width; x++) {
-      const currentCell = current.get(x, y);
-      const neighborPattern = countNeighbors(current, automaton.length, x, y);
-      const state = automaton[currentCell];
-
-      if (!state) {
-        throw new Error(`[automaton error] missing state ${currentCell}`);
-      }
-
-      next.set(x, y, state.transitions[neighborPattern] ?? state.default);
-    }
-  }
-}
-
-function renderGrid(ctx: CanvasRenderingContext2D, board: Board) {
-  const cellWidth = ctx.canvas.width / board.width;
-  const cellHeight = ctx.canvas.height / board.height;
-
-  ctx.strokeStyle = "rgba(200, 235, 255, 0.08)";
-  ctx.lineWidth = 1;
-
-  for (let col = 1; col < board.width; col++) {
-    const x = col * cellWidth;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, ctx.canvas.height);
-    ctx.stroke();
-  }
-
-  for (let row = 1; row < board.height; row++) {
-    const y = row * cellHeight;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(ctx.canvas.width, y);
-    ctx.stroke();
-  }
+  return option;
 }
 
 function render(ctx: CanvasRenderingContext2D, automaton: Automaton, board: Board) {
@@ -119,15 +36,13 @@ function render(ctx: CanvasRenderingContext2D, automaton: Automaton, board: Boar
 
       ctx.fillStyle = state.color;
       ctx.fillRect(
-        x * cellWidth + 1,
-        y * cellHeight + 1,
-        Math.max(0, cellWidth - 1),
-        Math.max(0, cellHeight - 1),
+        x * cellWidth,
+        y * cellHeight,
+        cellWidth,
+        cellHeight,
       );
     }
   }
-
-  renderGrid(ctx, board);
 }
 
 function getCanvasCell(
@@ -148,34 +63,124 @@ function getCanvasCell(
 }
 
 function bootstrap() {
+  let runningStatus: RunningStatus = 'stopped';
+
   const game = document.querySelector("#game") as HTMLCanvasElement;
   const step = document.querySelector("#step") as HTMLButtonElement;
   const clear = document.querySelector("#clear") as HTMLButtonElement;
   const autoplay = document.querySelector("#autoplay") as HTMLButtonElement;
   const stop = document.querySelector("#stop") as HTMLButtonElement;
-  const randomFill = document.querySelector("#random") as HTMLButtonElement;
+  const automatonSelect = document.querySelector("#automaton-select") as HTMLSelectElement;
+  const stateList = document.querySelector("#state-list") as HTMLDivElement;
+
+  const controlDisabledByStatus: Record<RunningStatus, Record<string, boolean>> = {
+    stopped: {
+      step: false,
+      autoplay: false,
+      stop: true,
+      clear: false,
+    },
+    autoplaying: {
+      step: true,
+      autoplay: true,
+      stop: false,
+      clear: true,
+    },
+  };
+
+  const controls = {
+    step,
+    autoplay,
+    stop,
+    clear,
+  };
+
+  const syncControls = () => {
+    const disabledByControl = controlDisabledByStatus[runningStatus];
+
+    for (const [controlName, disabled] of Object.entries(disabledByControl)) {
+      controls[controlName as keyof typeof controls].disabled = disabled;
+    }
+  };
+
+  const setRunningStatus = (nextStatus: RunningStatus) => {
+    runningStatus = nextStatus;
+    syncControls();
+  };
 
   const ctx = game.getContext("2d");
   if (!ctx) {
     throw new Error("[canvas error] can not get canvas context");
   }
 
-  if (!autoplay || !stop || !randomFill) {
+  if (!autoplay || !stop || !automatonSelect || !stateList) {
     throw new Error("[dom error] can not find autoplay controls");
   }
 
   game.width = CANVAS_WIDTH;
   game.height = CANVAS_HEIGHT;
 
-  const automaton = Maze;
+  const defaultAutomatonOption = getAutomatonOption("maze");
+  let automaton = defaultAutomatonOption.automaton;
   let currentBoard = new Board(COLS, ROWS, automaton[0]!.default);
   let nextBoard = new Board(COLS, ROWS, automaton[0]!.default);
   let animationFrameId: number | null = null;
   let frameCount = 0;
+  let selectedCell: Cell = Math.min(1, automaton.length - 1);
 
-  const setAutoplayControls = (running: boolean) => {
-    autoplay.disabled = running;
-    stop.disabled = !running;
+  const renderAutomatonOptions = () => {
+    automatonSelect.replaceChildren(
+      ...automatonOptions.map((option) => {
+        const optionElement = document.createElement("option");
+
+        optionElement.value = option.id;
+        optionElement.textContent = option.name;
+
+        return optionElement;
+      }),
+    );
+
+    automatonSelect.value = defaultAutomatonOption.id;
+  };
+
+  const renderAutomatonStates = () => {
+    stateList.replaceChildren(
+      ...automaton.map((state, index) => {
+        const item = document.createElement("button");
+        const swatch = document.createElement("span");
+        const desc = document.createElement("span");
+
+        item.className = index === selectedCell ? "state-item is-selected" : "state-item";
+        item.type = "button";
+        swatch.className = "state-swatch";
+        desc.textContent = state.desc;
+        swatch.style.backgroundColor = state.color;
+        item.addEventListener("click", () => {
+          selectedCell = index;
+          renderAutomatonStates();
+        });
+
+        item.append(swatch, desc);
+
+        return item;
+      }),
+    );
+  };
+
+  const resetBoard = () => {
+    currentBoard = new Board(COLS, ROWS, automaton[0]!.default);
+    nextBoard = new Board(COLS, ROWS, automaton[0]!.default);
+  };
+
+  const selectAutomaton = (id: AutomatonOptionId) => {
+    const selectedOption = getAutomatonOption(id);
+
+    automaton = selectedOption.automaton;
+    selectedCell = Math.min(1, automaton.length - 1);
+    stopAutoplay();
+    resetBoard();
+    renderAutomatonStates();
+    draw();
   };
 
   const draw = () => {
@@ -199,7 +204,7 @@ function bootstrap() {
     }
 
     frameCount = 0;
-    setAutoplayControls(false);
+    setRunningStatus('stopped');
   };
 
   const tick = () => {
@@ -222,7 +227,7 @@ function bootstrap() {
 
     frameCount = 0;
     animationFrameId = requestAnimationFrame(tick);
-    setAutoplayControls(true);
+    setRunningStatus('autoplaying');
   };
 
   const clearBoardState = () => {
@@ -231,40 +236,28 @@ function bootstrap() {
     draw();
   };
 
-  const fillBoardRandomly = () => {
-    const fillWidth = 40;
-    const fillHeight = 40;
-    const startX = Math.floor((currentBoard.width - fillWidth) / 2);
-    const startY = Math.floor((currentBoard.height - fillHeight) / 2);
-
-    currentBoard.fill(automaton[0]!.default);
-
-    for (let y = startY; y < startY + fillHeight; y++) {
-      for (let x = startX; x < startX + fillWidth; x++) {
-        currentBoard.set(x, y, Math.random() < 0.5 ? 1 : 0);
-      }
-    }
-
-    nextBoard.fill(automaton[0]!.default);
-    draw();
-  };
-
-  const toggleCellState = (event: MouseEvent) => {
+  const paintCellState = (event: PointerEvent) => {
     const { x, y } = getCanvasCell(game, currentBoard, event);
-    const nextCell = currentBoard.get(x, y) === 0 ? 1 : 0;
+    const defaultCell = automaton[0]!.default;
+    const nextCell = event.button === 2 ? defaultCell : selectedCell;
 
     currentBoard.set(x, y, nextCell);
     draw();
   };
 
-  game.addEventListener("click", toggleCellState);
+  game.addEventListener("pointerdown", paintCellState);
+  game.addEventListener("contextmenu", (event) => event.preventDefault());
   step.addEventListener("click", stepOnce);
   clear.addEventListener("click", clearBoardState);
   autoplay.addEventListener("click", startAutoplay);
   stop.addEventListener("click", stopAutoplay);
-  randomFill.addEventListener("click", fillBoardRandomly);
+  automatonSelect.addEventListener("change", () => {
+    selectAutomaton(automatonSelect.value as AutomatonOptionId);
+  });
 
-  setAutoplayControls(false);
+  renderAutomatonOptions();
+  renderAutomatonStates();
+  syncControls();
   draw();
 }
 

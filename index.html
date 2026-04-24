@@ -1,77 +1,258 @@
 <!doctype html>
 <html lang="zh-CN">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>生命游戏</title>
-        <style>
-            :root {
-                color-scheme: dark;
-                font-family:
-                    "SF Pro Display", "PingFang SC", "Microsoft YaHei",
-                    sans-serif;
-                background: #0a1116;
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>生命游戏</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            width: 100%;
+            background:
+                linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+                linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+                #f7f3e8;
+            background-size: 20px 20px;
+            color: #151515;
+            font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        }
+
+        canvas {
+            display: block;
+            width: min(100%, 720px);
+            aspect-ratio: 1;
+            border: 3px solid #151515;
+            background: #f8fafc;
+            box-shadow: 10px 10px 0 #151515;
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: minmax(220px, 28vw) minmax(0, 1fr);
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        .aside {
+            min-height: 100vh;
+            padding: 24px;
+            border-right: 3px solid #151515;
+            background: #fffdf4;
+        }
+
+        .panel-title {
+            margin: 0 0 8px;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+        }
+
+        .panel-desc {
+            margin: 0 0 22px;
+            color: #4b5563;
+            line-height: 1.55;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field-label,
+        .states-title {
+            color: #151515;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        select {
+            width: 100%;
+            border: 3px solid #151515;
+            border-radius: 0;
+            padding: 11px 12px;
+            background: #f8fafc;
+            color: #151515;
+            font: inherit;
+            font-weight: 700;
+            box-shadow: 5px 5px 0 #151515;
+        }
+
+        .states-panel {
+            margin-top: 24px;
+        }
+
+        .state-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .state-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 36px;
+            border: 2px solid transparent;
+            border-radius: 0;
+            padding: 8px;
+            background: transparent;
+            color: #151515;
+            font: inherit;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+            transition: background 120ms steps(2), transform 120ms steps(2), box-shadow 120ms steps(2);
+        }
+
+        .state-item:hover {
+            background: #e7f8b7;
+        }
+
+        .state-item.is-selected {
+            border-color: #151515;
+            background: #c8ff3d;
+            box-shadow: 4px 4px 0 #151515;
+            transform: translate(-2px, -2px);
+        }
+
+        .state-swatch {
+            width: 18px;
+            height: 18px;
+            flex: 0 0 18px;
+            border: 2px solid #151515;
+            border-radius: 0;
+            box-shadow: 2px 2px 0 #151515;
+        }
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 32px;
+            background:
+                linear-gradient(135deg, transparent 0 48%, rgba(21, 21, 21, 0.08) 48% 52%, transparent 52% 100%),
+                #f7f3e8;
+            background-size: 24px 24px;
+        }
+
+        .toolbar {
+            width: min(100%, 720px);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        button {
+            border: 3px solid #151515;
+            border-radius: 0;
+            padding: 10px 14px;
+            background: #fffdf4;
+            color: #151515;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 5px 5px 0 #151515;
+            transition: transform 120ms steps(2), box-shadow 120ms steps(2), background 120ms steps(2);
+        }
+
+        button:hover:not(:disabled) {
+            background: #c8ff3d;
+            box-shadow: 3px 3px 0 #151515;
+            transform: translate(2px, 2px);
+        }
+
+        button:active:not(:disabled) {
+            box-shadow: 0 0 0 #151515;
+            transform: translate(5px, 5px);
+        }
+
+        button:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: 3px 3px 0 #9ca3af;
+            border-color: #9ca3af;
+        }
+
+        @media (max-width: 760px) {
+            .app {
+                grid-template-columns: 1fr;
             }
 
-            * {
-                box-sizing: border-box;
+            .aside {
+                min-height: auto;
+                border-right: 0;
+                border-bottom: 3px solid #151515;
             }
 
-            body {
-                margin: 0;
-                min-height: 100vh;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .title {
-                margin: 0;
-                font-size: clamp(24px, 4vw, 34px);
-                font-weight: 700;
-                letter-spacing: 0.04em;
-            }
-
-            .subtitle {
-                margin: 0;
-                color: rgba(239, 248, 255, 0.72);
-                font-size: 14px;
-            }
-
-            .toolbar {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                margin-bottom: 12px;
+            .main {
+                min-height: auto;
+                padding: 24px;
+                justify-content: flex-start;
             }
 
             canvas {
-                display: block;
-                width: min(92vw, 800px);
-                aspect-ratio: 1;
-                border: 1px solid rgba(200, 235, 255, 0.12);
-                background: #08141a;
-                border-radius: 12px;
-                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
-                image-rendering: pixelated;
-                touch-action: none;
+                box-shadow: 6px 6px 0 #151515;
             }
-        </style>
-    </head>
-    <body>
-            <main class="app">
-                <div class="toolbar">
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+
+        <aside class="aside" aria-label="自动机配置">
+            <h2 class="panel-title">自动机规则</h2>
+            <p class="panel-desc">选择规则后，下方会显示该规则包含的状态和对应色块。</p>
+
+            <label class="field" for="automaton-select">
+                <span class="field-label">当前规则</span>
+                <select id="automaton-select"></select>
+            </label>
+
+            <section class="states-panel" aria-labelledby="states-title">
+                <div class="states-title" id="states-title">状态色块</div>
+                <div class="state-list" id="state-list"></div>
+            </section>
+        </aside>
+
+        <main class="main">
+            <div class="toolbar">
+                <div class="btn-group">
                     <button id="step" type="button">单步</button>
-                    <button id="clear" type="button">清空</button>
                     <button id="autoplay" type="button">自动运行</button>
                     <button id="stop" type="button">停止</button>
-                    <button id="random" type="button">随机填充</button>
+                    <button id="clear" type="button">清空</button>
                 </div>
+            </div>
 
             <canvas id="game"></canvas>
         </main>
 
-        <script type="module" src="./src/bootstrap.ts"></script>
-    </body>
+    </div>
+
+
+    <script type="module" src="./src/bootstrap.ts"></script>
+</body>
+
 </html>

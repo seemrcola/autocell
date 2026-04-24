@@ -1,5 +1,10 @@
 {
   "name": "autocell",
+  "scripts": {
+    "dev": "bun run index.html",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
