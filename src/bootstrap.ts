@@ -62,6 +62,21 @@ function getCanvasCell(
   };
 }
 
+export function getPaintCellForPointerEvent(
+  event: Pick<PointerEvent, "button" | "buttons">,
+  selectedCell: Cell,
+  defaultCell: Cell,
+): Cell {
+  return event.button === 2 || event.buttons === 2 ? defaultCell : selectedCell;
+}
+
+export function shouldPaintForPointerEvent(
+  event: Pick<PointerEvent, "type" | "buttons">,
+  isPainting: boolean,
+): boolean {
+  return event.type === "pointerdown" || isPainting;
+}
+
 function bootstrap() {
   let runningStatus: RunningStatus = 'stopped';
 
@@ -127,6 +142,7 @@ function bootstrap() {
   let animationFrameId: number | null = null;
   let frameCount = 0;
   let selectedCell: Cell = Math.min(1, automaton.length - 1);
+  let isPainting = false;
 
   const renderAutomatonOptions = () => {
     automatonSelect.replaceChildren(
@@ -237,15 +253,34 @@ function bootstrap() {
   };
 
   const paintCellState = (event: PointerEvent) => {
+    if (!shouldPaintForPointerEvent(event, isPainting)) {
+      return;
+    }
+
+    event.preventDefault();
+
     const { x, y } = getCanvasCell(game, currentBoard, event);
-    const defaultCell = automaton[0]!.default;
-    const nextCell = event.button === 2 ? defaultCell : selectedCell;
+    const nextCell = getPaintCellForPointerEvent(event, selectedCell, automaton[0]!.default);
 
     currentBoard.set(x, y, nextCell);
     draw();
   };
 
-  game.addEventListener("pointerdown", paintCellState);
+  const startPainting = (event: PointerEvent) => {
+    isPainting = true;
+    game.setPointerCapture?.(event.pointerId);
+    paintCellState(event);
+  };
+
+  const stopPainting = () => {
+    isPainting = false;
+  };
+
+  game.addEventListener("pointerdown", startPainting);
+  game.addEventListener("pointermove", paintCellState);
+  game.addEventListener("pointerup", stopPainting);
+  game.addEventListener("pointercancel", stopPainting);
+  game.addEventListener("pointerleave", stopPainting);
   game.addEventListener("contextmenu", (event) => event.preventDefault());
   step.addEventListener("click", stepOnce);
   clear.addEventListener("click", clearBoardState);
@@ -261,4 +296,6 @@ function bootstrap() {
   draw();
 }
 
-window.addEventListener("load", bootstrap);
+if (typeof window !== "undefined") {
+  window.addEventListener("load", bootstrap);
+}
