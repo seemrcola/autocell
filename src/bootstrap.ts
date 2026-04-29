@@ -1,9 +1,11 @@
 import { Board, computeNextBoard } from "./core";
+import "./components/automaton-select";
 import { automatonOptions } from "./rules";
+import type { AutomatonSelectElement } from "./components/automaton-select";
 import type { Automaton, AutomatonOption, Cell, RunningStatus } from "./types";
 
-const COLS = 200;
-const ROWS = 200;
+const COLS = 80;
+const ROWS = 80;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
 
@@ -17,14 +19,6 @@ function getAutomatonOption(id: AutomatonOptionId): AutomatonOption {
   }
 
   return option;
-}
-
-export function getRelativeOptionIndex(currentIndex: number, optionCount: number, direction: -1 | 1): number {
-  if (optionCount <= 0) {
-    return currentIndex;
-  }
-
-  return (currentIndex + direction + optionCount) % optionCount;
 }
 
 function render(ctx: CanvasRenderingContext2D, automaton: Automaton, board: Board) {
@@ -93,11 +87,7 @@ function bootstrap() {
   const clear = document.querySelector("#clear") as HTMLButtonElement;
   const autoplay = document.querySelector("#autoplay") as HTMLButtonElement;
   const stop = document.querySelector("#stop") as HTMLButtonElement;
-  const automatonSelect = document.querySelector("#automaton-select") as HTMLSelectElement;
-  const automatonDropdown = document.querySelector("#automaton-dropdown") as HTMLDivElement;
-  const automatonDropdownButton = document.querySelector("#automaton-dropdown-button") as HTMLButtonElement;
-  const automatonDropdownValue = document.querySelector("#automaton-dropdown-value") as HTMLSpanElement;
-  const automatonDropdownList = document.querySelector("#automaton-dropdown-list") as HTMLDivElement;
+  const automatonSelect = document.querySelector("#automaton-select") as AutomatonSelectElement;
   const stateList = document.querySelector("#state-list") as HTMLDivElement;
 
   const controlDisabledByStatus: Record<RunningStatus, Record<string, boolean>> = {
@@ -144,10 +134,6 @@ function bootstrap() {
     !autoplay ||
     !stop ||
     !automatonSelect ||
-    !automatonDropdown ||
-    !automatonDropdownButton ||
-    !automatonDropdownValue ||
-    !automatonDropdownList ||
     !stateList
   ) {
     throw new Error("[dom error] can not find autoplay controls");
@@ -165,146 +151,9 @@ function bootstrap() {
   let selectedCell: Cell = Math.min(1, automaton.length - 1);
   let isPainting = false;
 
-  const getCurrentAutomatonOptionIndex = () => {
-    const selectedIndex = automatonOptions.findIndex((option) => option.id === automatonSelect.value);
-
-    return Math.max(0, selectedIndex);
-  };
-
-  const getAutomatonOptionButtons = () => Array.from(
-    automatonDropdownList.querySelectorAll<HTMLButtonElement>(".select-option"),
-  );
-
-  const syncAutomatonDropdown = (id: AutomatonOptionId) => {
-    const selectedOption = getAutomatonOption(id);
-
-    automatonDropdownValue.textContent = selectedOption.name;
-
-    for (const optionButton of getAutomatonOptionButtons()) {
-      const isSelected = optionButton.dataset.automatonId === selectedOption.id;
-
-      optionButton.classList.toggle("is-selected", isSelected);
-      optionButton.setAttribute("aria-selected", String(isSelected));
-    }
-  };
-
-  const closeAutomatonDropdown = (focusTrigger = false) => {
-    automatonDropdown.classList.remove("is-open");
-    automatonDropdownButton.setAttribute("aria-expanded", "false");
-    automatonDropdownList.hidden = true;
-
-    if (focusTrigger) {
-      automatonDropdownButton.focus();
-    }
-  };
-
-  const focusAutomatonOption = (index: number) => {
-    const optionButton = getAutomatonOptionButtons()[index];
-
-    optionButton?.focus();
-    optionButton?.scrollIntoView({ block: "nearest" });
-  };
-
-  const openAutomatonDropdown = () => {
-    automatonDropdown.classList.add("is-open");
-    automatonDropdownButton.setAttribute("aria-expanded", "true");
-    automatonDropdownList.hidden = false;
-    syncAutomatonDropdown(automatonSelect.value as AutomatonOptionId);
-    focusAutomatonOption(getCurrentAutomatonOptionIndex());
-  };
-
-  const toggleAutomatonDropdown = () => {
-    if (automatonDropdownList.hidden) {
-      openAutomatonDropdown();
-      return;
-    }
-
-    closeAutomatonDropdown();
-  };
-
-  const moveAutomatonOptionFocus = (currentIndex: number, direction: -1 | 1) => {
-    focusAutomatonOption(getRelativeOptionIndex(currentIndex, automatonOptions.length, direction));
-  };
-
-  const activateAutomatonOption = (id: AutomatonOptionId) => {
-    selectAutomaton(id);
-    closeAutomatonDropdown(true);
-  };
-
-  const handleAutomatonTriggerKeydown = (event: KeyboardEvent) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      openAutomatonDropdown();
-      moveAutomatonOptionFocus(getCurrentAutomatonOptionIndex(), event.key === "ArrowDown" ? 1 : -1);
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      toggleAutomatonDropdown();
-      return;
-    }
-
-    if (event.key === "Escape") {
-      closeAutomatonDropdown();
-    }
-  };
-
-  const handleAutomatonOptionKeydown = (event: KeyboardEvent, optionIndex: number, optionId: AutomatonOptionId) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      moveAutomatonOptionFocus(optionIndex, event.key === "ArrowDown" ? 1 : -1);
-      return;
-    }
-
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      focusAutomatonOption(event.key === "Home" ? 0 : automatonOptions.length - 1);
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      activateAutomatonOption(optionId);
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeAutomatonDropdown(true);
-    }
-  };
-
   const renderAutomatonOptions = () => {
-    automatonSelect.replaceChildren(
-      ...automatonOptions.map((option) => {
-        const optionElement = document.createElement("option");
-
-        optionElement.value = option.id;
-        optionElement.textContent = option.name;
-
-        return optionElement;
-      }),
-    );
-
-    automatonDropdownList.replaceChildren(
-      ...automatonOptions.map((option, index) => {
-        const optionButton = document.createElement("button");
-
-        optionButton.className = "select-option";
-        optionButton.type = "button";
-        optionButton.textContent = option.name;
-        optionButton.dataset.automatonId = option.id;
-        optionButton.setAttribute("role", "option");
-        optionButton.addEventListener("click", () => activateAutomatonOption(option.id));
-        optionButton.addEventListener("keydown", (event) => handleAutomatonOptionKeydown(event, index, option.id));
-
-        return optionButton;
-      }),
-    );
-
+    automatonSelect.options = automatonOptions;
     automatonSelect.value = defaultAutomatonOption.id;
-    syncAutomatonDropdown(defaultAutomatonOption.id);
   };
 
   const renderAutomatonStates = () => {
@@ -344,7 +193,6 @@ function bootstrap() {
     selectedCell = Math.min(1, automaton.length - 1);
     stopAutoplay();
     resetBoard();
-    syncAutomatonDropdown(selectedOption.id);
     renderAutomatonStates();
     draw();
   };
@@ -436,13 +284,6 @@ function bootstrap() {
   clear.addEventListener("click", clearBoardState);
   autoplay.addEventListener("click", startAutoplay);
   stop.addEventListener("click", stopAutoplay);
-  automatonDropdownButton.addEventListener("click", toggleAutomatonDropdown);
-  automatonDropdownButton.addEventListener("keydown", handleAutomatonTriggerKeydown);
-  document.addEventListener("click", (event) => {
-    if (event.target instanceof Node && !automatonDropdown.contains(event.target)) {
-      closeAutomatonDropdown();
-    }
-  });
   automatonSelect.addEventListener("change", () => {
     selectAutomaton(automatonSelect.value as AutomatonOptionId);
   });
