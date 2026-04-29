@@ -65,6 +65,7 @@
         }
 
         .field {
+            position: relative;
             display: grid;
             gap: 8px;
         }
@@ -78,7 +79,23 @@
             text-transform: uppercase;
         }
 
-        select {
+        .native-select {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .select-control {
+            position: relative;
+        }
+
+        .select-trigger {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 18px;
+            align-items: center;
+            gap: 10px;
             width: 100%;
             border: 3px solid #151515;
             border-radius: 0;
@@ -87,7 +104,56 @@
             color: #151515;
             font: inherit;
             font-weight: 700;
+            text-align: left;
             box-shadow: 5px 5px 0 #151515;
+        }
+
+        .select-trigger:hover,
+        .select-trigger:focus-visible,
+        .select-control.is-open .select-trigger {
+            background: #c8ff3d;
+            box-shadow: 3px 3px 0 #151515;
+            transform: translate(2px, 2px);
+        }
+
+        .select-value {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .select-arrow {
+            width: 12px;
+            height: 12px;
+            justify-self: end;
+            border-right: 3px solid #151515;
+            border-bottom: 3px solid #151515;
+            transform: translateY(-3px) rotate(45deg);
+            transition: transform 120ms steps(2);
+        }
+
+        .select-control.is-open .select-arrow {
+            transform: translateY(3px) rotate(225deg);
+        }
+
+        .select-popover {
+            position: absolute;
+            z-index: 10;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            display: grid;
+            gap: 4px;
+            max-height: min(48vh, 360px);
+            overflow-y: auto;
+            border: 3px solid #151515;
+            padding: 6px;
+            background: #fffdf4;
+            box-shadow: 7px 7px 0 #151515;
+        }
+
+        .select-popover[hidden] {
+            display: none;
         }
 
         .states-panel {
@@ -194,6 +260,34 @@
             border-color: #9ca3af;
         }
 
+        .select-popover .select-option {
+            width: 100%;
+            border: 2px solid transparent;
+            padding: 9px 10px;
+            background: transparent;
+            box-shadow: none;
+            font-weight: 700;
+            text-align: left;
+            transition: background 120ms steps(2), border-color 120ms steps(2), transform 120ms steps(2);
+        }
+
+        .select-popover .select-option:hover:not(:disabled),
+        .select-popover .select-option:focus-visible {
+            background: #e7f8b7;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .select-popover .select-option:active:not(:disabled) {
+            box-shadow: none;
+            transform: none;
+        }
+
+        .select-popover .select-option.is-selected {
+            border-color: #151515;
+            background: #c8ff3d;
+        }
+
         @media (max-width: 760px) {
             .app {
                 grid-template-columns: 1fr;
@@ -225,10 +319,31 @@
             <h2 class="panel-title">自动机规则</h2>
             <p class="panel-desc">选择规则后，下方会显示该规则包含的状态和对应色块。</p>
 
-            <label class="field" for="automaton-select">
-                <span class="field-label">当前规则</span>
-                <select id="automaton-select"></select>
-            </label>
+            <div class="field">
+                <span class="field-label" id="automaton-select-label">当前规则</span>
+                <select class="native-select" id="automaton-select" aria-hidden="true" tabindex="-1"></select>
+                <div class="select-control" id="automaton-dropdown">
+                    <button
+                        class="select-trigger"
+                        id="automaton-dropdown-button"
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-controls="automaton-dropdown-list"
+                        aria-labelledby="automaton-select-label automaton-dropdown-value"
+                    >
+                        <span class="select-value" id="automaton-dropdown-value">迷宫</span>
+                        <span class="select-arrow" aria-hidden="true"></span>
+                    </button>
+                    <div
+                        class="select-popover"
+                        id="automaton-dropdown-list"
+                        role="listbox"
+                        aria-labelledby="automaton-select-label"
+                        hidden
+                    ></div>
+                </div>
+            </div>
 
             <section class="states-panel" aria-labelledby="states-title">
                 <div class="states-title" id="states-title">状态色块</div>

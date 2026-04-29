@@ -1,5 +1,7 @@
 # Autocell 元胞自动机探索
 
+> tsoding https://github.com/rexim
+
 一个用 TypeScript、Canvas 和 Bun 编写的元胞自动机 playground。当前支持康威生命游戏、Maze、HighLife、Brian's Brain、Wireworld 等多种规则，并允许在页面中切换规则和绘制不同状态的细胞。
 
 ## 运行
